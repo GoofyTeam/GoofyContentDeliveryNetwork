@@ -1,0 +1,19 @@
+FROM golang:1.23-alpine
+
+WORKDIR /app
+
+# Installation des dépendances système et outils de développement
+RUN apk add --no-cache git curl && \
+    go install github.com/air-verse/air@latest
+
+# Copie des fichiers de configuration
+COPY app/back/go.mod app/back/go.sum ./
+
+# Téléchargement des dépendances
+RUN go mod download
+
+# Le code source sera monté comme volume
+EXPOSE 8080
+
+# Utilisation de Air pour le hot-reload
+CMD ["air", "-c", ".air.toml"]

@@ -1,0 +1,77 @@
+services:
+  cdn:
+    build:
+      context: .
+      dockerfile: docker/cdn/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./app/CDN:/app
+  backend:
+    build:
+      context: .
+      dockerfile: docker/back/Dockerfile
+    ports:
+      - "8082:8080"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017
+      - GIN_MODE=release
+    networks:
+      - goofy-network
+    depends_on:
+      - mongodb
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  mongodb:
+    image: mongo:latest
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - goofy-network
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  redis:
+    image: redis:alpine
+    networks:
+      - goofy-network
+    volumes:
+      - redis-data:/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - goofy-network
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - goofy-network
+    depends_on:
+      - prometheus
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+networks:
+  goofy-network:
+    driver: bridge
+
+volumes:
+  mongodb-data:
+  redis-data:
+  grafana-data:

@@ -1,0 +1,20 @@
+# Image de développement avec hot-reload
+FROM golang:1.23-alpine
+
+WORKDIR /app
+
+# Installation des dépendances de base
+RUN apk add --no-cache git
+
+# Installation de Air pour le hot-reload
+RUN go install github.com/air-verse/air@latest
+
+# Copie des fichiers de dépendances
+COPY app/CDN/go.mod app/CDN/go.sum ./
+RUN go mod download
+
+# Configuration de Air
+COPY app/CDN/.air.toml ./
+
+# Le code source sera monté comme un volume
+CMD ["air"]
