@@ -1,0 +1,42 @@
+groups:
+  - name: cdn_alerts
+    rules:
+      # Alerte sur la latence
+      - alert: HighLatency
+        expr: rate(cdn_request_duration_seconds_sum[5m]) / rate(cdn_request_duration_seconds_count[5m]) > 0.3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latence élevée détectée"
+          description: "La latence moyenne dépasse 300ms sur les 5 dernières minutes"
+
+      # Alerte sur les backends inactifs
+      - alert: LowActiveBackends
+        expr: cdn_active_backends < 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backends insuffisants"
+          description: "Nombre de backends actifs insuffisant"
+
+      # Alerte sur le taux d'erreurs
+      - alert: HighErrorRate
+        expr: rate(cdn_requests_total{status=~"5.."}[5m]) / rate(cdn_requests_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taux d'erreurs élevé"
+          description: "Plus de 5% des requêtes sont en erreur"
+
+      # Alerte sur une possible attaque DDoS
+      - alert: PossibleDDoSAttack
+        expr: rate(cdn_requests_total[1m]) > 1000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Possible attaque DDoS"
+          description: "Plus de 1000 requêtes par seconde détectées"

@@ -7,6 +7,11 @@ services:
       - "8080:8080"
     volumes:
       - ./app/CDN:/app
+    networks:
+      - goofy-network
+    depends_on:
+      - backend
+
   backend:
     build:
       context: .
@@ -46,7 +51,16 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus:/etc/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - goofy-network
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
     networks:
       - goofy-network
 
@@ -54,7 +68,15 @@ services:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
     volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
       - grafana-data:/var/lib/grafana
     networks:
       - goofy-network

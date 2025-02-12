@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goofy-cdn
+  labels:
+    app: goofy-cdn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: goofy-cdn
+  template:
+    metadata:
+      labels:
+        app: goofy-cdn
+    spec:
+      containers:
+      - name: goofy-cdn
+        # image: misterzapp/goofy-cdn:latest
+        image: goofy-cdn:local
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
