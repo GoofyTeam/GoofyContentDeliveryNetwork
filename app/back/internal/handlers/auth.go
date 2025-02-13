@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"app/internal/models"
+	"fmt"
 	"net/http"
 	"os"
 	"regexp"
@@ -60,6 +61,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// Log pour le débogage
+	fmt.Printf("Register - Password length: %d, Hash length: %d\n", len(user.Password), len(hashedPassword))
+
 	// Création de l'utilisateur
 	user.Password = string(hashedPassword)
 	user.CreatedAt = time.Now()
@@ -94,14 +98,22 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var user models.User
 	err := h.userCollection.FindOne(c, bson.M{"email": loginReq.Email}).Decode(&user)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilisateur non trouvé"})
+		} else {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Erreur lors de la recherche de l'utilisateur: " + err.Error()})
+		}
 		return
 	}
+
+	// Log pour le débogage
+	fmt.Printf("Login - Stored hash length: %d, Input password length: %d\n", len(user.Password), len(loginReq.Password))
+	fmt.Printf("Login - Input password: %s\n", loginReq.Password)
 
 	// Vérification du mot de passe
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginReq.Password))
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Mot de passe incorrect"})
 		return
 	}
 

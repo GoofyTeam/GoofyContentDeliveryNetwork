@@ -72,6 +72,7 @@ func main() {
 	protected.Use(middleware.AuthMiddleware())
 	{
 		// Gestion des dossiers
+		protected.GET("/folders", folderHandler.ListAllFolders)
 		protected.POST("/folders", folderHandler.CreateFolder)
 		protected.GET("/folders/:id", folderHandler.ListFolderContents)
 		protected.DELETE("/folders/:id", folderHandler.DeleteFolder)

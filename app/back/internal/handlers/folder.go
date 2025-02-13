@@ -120,6 +120,39 @@ func (h *FolderHandler) ListFolderContents(c *gin.Context) {
 	})
 }
 
+// ListAllFolders liste tous les dossiers de l'utilisateur
+func (h *FolderHandler) ListAllFolders(c *gin.Context) {
+	// Récupérer l'ID de l'utilisateur depuis le contexte
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+
+	// L'ID est déjà un ObjectID depuis le middleware
+	objectID, ok := userID.(primitive.ObjectID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+		return
+	}
+
+	// Trouver tous les dossiers de l'utilisateur
+	cursor, err := h.folderCollection.Find(c, bson.M{"user_id": objectID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch folders"})
+		return
+	}
+	defer cursor.Close(c)
+
+	var folders []models.Folder
+	if err := cursor.All(c, &folders); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode folders"})
+		return
+	}
+
+	c.JSON(http.StatusOK, folders)
+}
+
 // DeleteFolder supprime un dossier et son contenu
 func (h *FolderHandler) DeleteFolder(c *gin.Context) {
 	folderID, err := primitive.ObjectIDFromHex(c.Param("id"))
