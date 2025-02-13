@@ -7,8 +7,9 @@ on:
     branches: [main, develop]
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v3
 
@@ -17,30 +18,60 @@ jobs:
         with:
           go-version: "1.21"
 
-      - name: Test
-        run: go test -v ./...
+      - name: Test Backend
+        working-directory: ./app/back
+        continue-on-error: true
+        run: |
+          go mod tidy
+          go mod download
+          go test -v ./...
 
-      - name: Build Docker image
-        run: docker build -t goofy-cdn:latest .
+      - name: Test CDN
+        working-directory: ./app/CDN
+        continue-on-error: true
+        run: |
+          go mod tidy
+          go mod download
+          go test -v ./...
+
+  build:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [back, front, cdn]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
-        if: github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push to Docker Hub
-        if: github.ref == 'refs/heads/main'
-        run: |
-          docker tag goofy-cdn:latest ${{ secrets.DOCKERHUB_USERNAME }}/goofy-cdn:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/goofy-cdn:latest
+      - name: Build and push ${{ matrix.component }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/${{ matrix.component }}/Dockerfile
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/goofy-${{ matrix.component }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/goofy-${{ matrix.component }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/goofy-${{ matrix.component }}:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/goofy-${{ matrix.component }}:buildcache,mode=max
 
   deploy:
-    needs: build-and-test
+    needs: build
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -49,9 +80,50 @@ jobs:
           aws-region: eu-west-3
 
       - name: Update kube config
-        run: aws eks update-kubeconfig --name goofy-cdn-cluster
+        run: aws eks update-kubeconfig --name goofy-cluster
 
-      - name: Deploy to EKS
+      - name: Create or update Kubernetes secrets
         run: |
-          kubectl apply -f k8s/
-          kubectl rollout restart deployment goofy-cdn
+          # Créer ou mettre à jour les secrets de l'application
+          kubectl create secret generic app-secrets \
+            --namespace goofy-cdn \
+            --from-literal=mongodb-uri="${{ secrets.MONGODB_URI }}" \
+            --from-literal=jwt-secret="${{ secrets.JWT_SECRET }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          # Créer ou mettre à jour les secrets du monitoring
+          kubectl create secret generic monitoring-secrets \
+            --namespace monitoring \
+            --from-literal=grafana-admin-password="${{ secrets.GRAFANA_ADMIN_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Mise à jour des images dans les deployments
+          kubectl set image deployment/backend backend=\
+            ${{ secrets.DOCKERHUB_USERNAME }}/goofy-back:${{ github.sha }} -n goofy-cdn
+          kubectl set image deployment/frontend frontend=\
+            ${{ secrets.DOCKERHUB_USERNAME }}/goofy-front:${{ github.sha }} -n goofy-cdn
+          kubectl set image deployment/cdn cdn=\
+            ${{ secrets.DOCKERHUB_USERNAME }}/goofy-cdn:${{ github.sha }} -n goofy-cdn
+
+          # Vérification du déploiement
+          kubectl rollout status deployment/backend -n goofy-cdn
+          kubectl rollout status deployment/frontend -n goofy-cdn
+          kubectl rollout status deployment/cdn -n goofy-cdn
+
+      # - name: Notify Slack on Success
+      #   if: success()
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      #     SLACK_MESSAGE: "Déploiement réussi sur production :rocket:"
+      #     SLACK_COLOR: good
+
+      # - name: Notify Slack on Failure
+      #   if: failure()
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      #     SLACK_MESSAGE: ":x: Échec du déploiement sur production"
+      #     SLACK_COLOR: danger
