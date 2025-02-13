@@ -1,159 +1,164 @@
-# CDN Go - Projet de Content Delivery Network
+# CDN Go – Projet de Réseau de Diffusion de Contenu
 
-Ce projet implémente un Content Delivery Network (CDN) en Go, conçu pour optimiser la distribution de contenu web avec des fonctionnalités avancées de mise en cache, de répartition de charge et de monitoring.
+Ce projet, développé en Go, met en place un Content Delivery Network (CDN) afin d’optimiser la distribution de contenu web. Il intègre des mécanismes avancés de mise en cache, de répartition de charge et de monitoring.
 
 ## 🚀 Fonctionnalités
 
 - **Proxy HTTP** : Redirection intelligente des requêtes
-- **Système de Cache** :
+- **Mécanisme de Cache** :
   - Cache LRU en mémoire
-  - Support Redis pour le cache distribué
-- **Load Balancing** :
+  - Intégration de Redis pour un cache distribué
+- **Répartition de Charge** :
   - Round Robin
   - Weighted Round Robin
   - Least Connections
 - **Sécurité** :
-  - Rate Limiting
-  - Protection DDoS
-  - Headers de sécurité HTTP
+  - Limitation du débit (Rate Limiting)
+  - Protection contre les attaques DDoS
+  - Application de headers de sécurité HTTP
 - **Monitoring** :
-  - Métriques Prometheus
-  - Visualisation Grafana
-  - Logging structuré avec Logrus
+  - Collecte de métriques via Prometheus
+  - Visualisation avec Grafana
+  - Logging structuré grâce à Logrus
 
 ## 🛠 Prérequis
 
 - Docker
 - Docker Compose
-- Go 1.23+ (pour le développement local)
+- Go 1.23 ou supérieur (pour le développement local)
 
 ## 🚦 Démarrage
 
-1. **Mode Développement** :
+### 1. Mode Développement
+
+Lancer l’application en mode développement avec hot-reload :
 
 ```bash
 docker compose up app-dev
 ```
 
-- Hot-reload activé
-- Accessible sur http://localhost:8080
-- Métriques sur http://localhost:8080/metrics
+- Accessible via [http://localhost:8080](http://localhost:8080)
+- Les métriques sont disponibles sur [http://localhost:8080/metrics](http://localhost:8080/metrics)
 
-2. **Mode Production** :
+### 2. Mode Production
+
+Démarrer en mode production :
 
 ```bash
 docker compose up app-prod
 ```
 
-- Optimisé pour la production
-- Accessible sur http://localhost:8081
-- Métriques sur http://localhost:8081/metrics
+- Optimisé pour un environnement de production
+- Accessible via [http://localhost:8081](http://localhost:8081)
+- Les métriques se trouvent sur [http://localhost:8081/metrics](http://localhost:8081/metrics)
 
-3. **Services additionnels** :
+### 3. Services Complémentaires
 
-- Grafana : http://localhost:3000 (admin/admin)
-- Prometheus : http://localhost:9090
-- Redis : localhost:6379
+- **Grafana** : [http://localhost:3000](http://localhost:3000) (identifiants par défaut : admin/admin)
+- **Prometheus** : [http://localhost:9090](http://localhost:9090)
+- **Redis** : Accessible sur localhost:6379
 
-## 🏗 Structure du Projet
+## 🏗 Organisation du Projet
 
 ```
 app/
 ├── internal/
-│   ├── cache/          # Implémentation du cache (LRU, Redis)
-│   ├── loadbalancer/   # Algorithmes de load balancing
-│   └── middleware/     # Middlewares (sécurité, métriques)
+│   ├── cache/          # Gestion du cache (implémentation LRU et intégration Redis)
+│   ├── loadbalancer/   # Algorithmes de répartition de charge
+│   └── middleware/     # Middlewares pour la sécurité et le monitoring
 ├── pkg/
-│   └── config/         # Configuration de l'application
-└── main.go            # Point d'entrée de l'application
+│   └── config/         # Fichiers de configuration de l’application
+└── main.go             # Point d’entrée de l’application
 ```
 
-## 🔍 Fonctionnement Détaillé
+## 🔍 Fonctionnement en Détail
 
 ### 1. Système de Cache
 
 - **Cache LRU** (`internal/cache/cache.go`) :
-  - Implémente l'interface `Cache`
-  - Utilise `hashicorp/golang-lru` pour la gestion du cache en mémoire
-  - Limite configurable de la taille du cache
-  - Cache uniquement les requêtes GET
-  - TTL configurable pour les entrées du cache
+  - Respecte l’interface `Cache`
+  - S’appuie sur la librairie `hashicorp/golang-lru` pour la gestion en mémoire
+  - Taille du cache configurable
+  - Cible uniquement les requêtes GET
+  - Durée de vie (TTL) des entrées paramétrable
 
 - **Endpoints de Gestion du Cache** :
-  - `POST /cache/purge` : Vide complètement le cache
+  - `POST /cache/purge` : Permet de vider l’intégralité du cache  
+    Exemple d’utilisation :
     ```bash
-    # Exemple d'utilisation
     curl -X POST http://localhost:8080/cache/purge
     ```
 
 ### 2. Load Balancer
 
-- **Implémentations** (`internal/loadbalancer/loadbalancer.go`) :
-  - `RoundRobin` : Distribution cyclique des requêtes
-  - `WeightedRoundRobin` : Distribution pondérée selon la capacité des serveurs
-  - `LeastConnections` : Envoi vers le serveur le moins chargé
+- **Implémentations** (voir `internal/loadbalancer/loadbalancer.go`) :
+  - **RoundRobin** : Distribution cyclique des requêtes
+  - **WeightedRoundRobin** : Distribution pondérée en fonction des capacités des serveurs
+  - **LeastConnections** : Acheminement vers le serveur avec le moins de connexions actives
 
 ### 3. Endpoints API
 
 #### Backend Service (port 8080)
+
 - **Authentification** :
-  - `POST /register` : Inscription d'un nouvel utilisateur
-  - `POST /login` : Connexion utilisateur
+  - `POST /register` : Inscription d’un nouvel utilisateur
+  - `POST /login` : Connexion d’un utilisateur
 
-- **Gestion des Fichiers** (requiert authentification) :
-  - `POST /api/files` : Upload d'un fichier
-  - `GET /api/files/:id` : Récupération d'un fichier
-  - `DELETE /api/files/:id` : Suppression d'un fichier
+- **Gestion des Fichiers** *(authentification requise)* :
+  - `POST /api/files` : Upload d’un fichier
+  - `GET /api/files/:id` : Récupération d’un fichier
+  - `DELETE /api/files/:id` : Suppression d’un fichier
 
-- **Gestion des Dossiers** (requiert authentification) :
-  - `POST /api/folders` : Création d'un dossier
-  - `GET /api/folders/:id` : Liste du contenu d'un dossier
-  - `DELETE /api/folders/:id` : Suppression d'un dossier
+- **Gestion des Dossiers** *(authentification requise)* :
+  - `POST /api/folders` : Création d’un dossier
+  - `GET /api/folders/:id` : Affichage du contenu d’un dossier
+  - `DELETE /api/folders/:id` : Suppression d’un dossier
 
 - **Health Check** :
-  - `GET /health` : Vérification de l'état du service
+  - `GET /health` : Vérification de l’état du service
 
 #### CDN Service (port 8080)
+
 - **Cache** :
-  - `POST /cache/purge` : Vide le cache
-  - Note : Seules les requêtes GET sont mises en cache
+  - `POST /cache/purge` : Effacement du cache
+  - *Note* : Seules les requêtes GET sont mises en cache
 
 - **Monitoring** :
-  - `GET /metrics` : Métriques Prometheus
-  - `GET /health` : État du CDN
-  - `GET /ready` : Vérification de disponibilité
+  - `GET /metrics` : Exposition des métriques Prometheus
+  - `GET /health` : État de santé du CDN
+  - `GET /ready` : Vérification de la disponibilité
 
 ### 4. Monitoring
 
-- **Métriques** :
+- **Métriques Collectées** :
   - Temps de réponse des requêtes
   - Nombre de requêtes par endpoint
-  - Taux de succès/erreur
+  - Taux de réussite vs. échec
   - Utilisation du cache
 
-- **Visualisation dans Grafana** via Prometheus
+- **Visualisation** : Les données sont exploitées dans Grafana via Prometheus
 
 ### 5. Application Principale
 
-Le fichier `main.go` orchestre tous ces composants :
-
-1. Initialise le logger et le cache
-2. Configure le load balancer
-3. Met en place les middlewares de sécurité et monitoring
-4. Démarre le serveur HTTP avec gestion gracieuse de l'arrêt
+Le fichier `main.go` orchestre l’ensemble des composants en :
+1. Initialisant le logger et le cache
+2. Configurant le load balancer
+3. Déployant les middlewares pour la sécurité et le monitoring
+4. Démarrant le serveur HTTP avec une gestion gracieuse de l’arrêt
 
 ## 📊 Monitoring
 
-### Métriques disponibles :
+### Métriques Disponibles :
 
-- `http_duration_seconds` : Temps de réponse des requêtes
-- `http_requests_total` : Nombre total de requêtes par endpoint
-- Visualisation dans Grafana via Prometheus
+- `http_duration_seconds` : Mesure du temps de réponse des requêtes
+- `http_requests_total` : Compte total des requêtes par endpoint
+
+Les visualisations se font via Grafana, en s’appuyant sur Prometheus.
 
 ## 🔒 Sécurité
 
-- Rate limiting : 100 requêtes/seconde par défaut
-- Headers de sécurité :
+- **Rate Limiting** : Limitation par défaut à 100 requêtes par seconde
+- **Headers de Sécurité** :
   - `X-Frame-Options`
   - `X-Content-Type-Options`
   - `X-XSS-Protection`
@@ -162,10 +167,12 @@ Le fichier `main.go` orchestre tous ces composants :
 
 ## 🤝 Contribution
 
-1. Fork le projet
-2. Créez votre branche (`git checkout -b feature/amazing-feature`)
-3. Committez vos changements (`git commit -m 'Add amazing feature'`)
-4. Push vers la branche (`git push origin feature/amazing-feature`)
+Pour contribuer :
+
+1. Forkez le projet
+2. Créez votre branche de travail (par exemple : `git checkout -b feature/amazing-feature`)
+3. Effectuez vos commits (`git commit -m 'Ajout d’une fonctionnalité géniale'`)
+4. Poussez votre branche (`git push origin feature/amazing-feature`)
 5. Ouvrez une Pull Request
 
 ## 🚀 Déploiement sur AWS EKS
@@ -177,13 +184,13 @@ Le fichier `main.go` orchestre tous ces composants :
 - `eksctl` installé
 - `kubectl` installé
 
-### 1. Construction de l'Image Docker
+### 1. Construction de l’Image Docker
 
 ```bash
-# Construction de l'image
+# Construction de l’image Docker
 docker build -t misterzapp/goofy-cdn:latest -f docker/cdn/Dockerfile .
 
-# Push vers Docker Hub
+# Envoi de l’image sur Docker Hub
 docker push misterzapp/goofy-cdn:latest
 ```
 
@@ -192,7 +199,6 @@ docker push misterzapp/goofy-cdn:latest
 #### Création du Cluster
 
 ```bash
-# Création du cluster EKS
 eksctl create cluster \
   --name goofy-cdn-cluster \
   --region eu-west-3 \
@@ -203,135 +209,141 @@ eksctl create cluster \
   --nodes-max 3
 ```
 
-#### Déploiement de l'Application
+#### Déploiement de l’Application
 
 ```bash
-# Déployer l'application
+# Déploiement via Kubernetes
 kubectl apply -f k8s/cdn-deployment.yaml
 kubectl apply -f k8s/cdn-service.yaml
 
-# Vérifier le déploiement
+# Vérification du déploiement
 kubectl get pods
 kubectl get services
 ```
 
 ### 3. Gestion des Ressources
 
-#### Vérification des Ressources
+#### Vérification
 
 ```bash
-# Lister les nœuds
+# Afficher les nœuds du cluster
 kubectl get nodes
 
-# Lister les pods
+# Lister tous les pods
 kubectl get pods --all-namespaces
 
-# Voir les logs
+# Afficher les logs des pods associés
 kubectl logs -l app=goofy-cdn
 ```
 
-#### Nettoyage des Ressources
+#### Nettoyage
 
 ```bash
 # Supprimer le nodegroup
 eksctl delete nodegroup --cluster goofy-cdn-cluster --name goofy-cdn-workers
 
-# Supprimer le cluster complet (arrête toute facturation)
+# Supprimer le cluster complet (pour éviter des coûts supplémentaires)
 eksctl delete cluster --name goofy-cdn-cluster
 ```
 
-### 4. Coûts AWS à Surveiller
+### 4. Surveillance des Coûts AWS
 
-- Cluster EKS : ~$0.10 par heure
-- Nœuds EC2 (t3.small) : ~$0.023 par heure par nœud
-- Load Balancer : ~$0.025 par heure
-- Volumes EBS et ENI : coûts variables selon l'utilisation
+- **Cluster EKS** : environ 0,10 $ par heure
+- **Nœuds EC2 (t3.small)** : environ 0,023 $ par heure par nœud
+- **Load Balancer** : environ 0,025 $ par heure
+- **Volumes EBS et ENI** : coûts variables selon l’utilisation
 
-⚠️ **Important** : Pensez à supprimer toutes les ressources après utilisation pour éviter des coûts inutiles.
+⚠️ **Important** : Veillez à supprimer l’ensemble des ressources après usage pour éviter des frais inutiles.
 
-### 5. Troubleshooting Courant
+### 5. Dépannage Courant
 
-#### Problèmes de CNI ( a voir car problème pour l'instant)
-
-Si les pods restent en état "ContainerCreating" :
+#### Problèmes de CNI
 
 ```bash
 # Réinstaller le CNI Amazon VPC
 kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.12.6/config/master/aws-k8s-cni.yaml
 
-# Redémarrer les pods CNI
+# Redémarrer les pods du CNI
 kubectl delete pods -n kube-system -l k8s-app=aws-node
 ```
 
 #### Problèmes de Permissions
 
-Vérifier que le rôle IAM a les bonnes politiques :
+Assurez-vous que le rôle IAM possède bien les politiques suivantes :
 
 - AmazonEKSClusterPolicy
 - AmazonEKSServicePolicy
 - AmazonEKSVPCResourceController
 - AmazonEKS_CNI_Policy
 
+---
+
 ## 🖥 Déploiement Local avec Docker Desktop
 
 ### Prérequis
+
 - Docker Desktop installé
-- Kubernetes activé dans Docker Desktop (avec kubeadm)
-- kubectl installé (`brew install kubectl`)
+- Kubernetes activé dans Docker Desktop (via kubeadm)
+- `kubectl` installé (ex. : `brew install kubectl`)
 
 ### 1. Configuration de Kubernetes dans Docker Desktop
-1. Ouvrir Docker Desktop
-2. Aller dans Settings > Kubernetes
-3. Sélectionner "Enable Kubernetes"
-4. Choisir "kubeadm" comme méthode de provisionnement
-5. Cliquer sur "Apply & Restart"
 
-### 2. Construction de l'Image
+1. Ouvrez Docker Desktop  
+2. Rendez-vous dans **Settings > Kubernetes**  
+3. Cochez **Enable Kubernetes**  
+4. Sélectionnez **kubeadm** comme méthode de provisionnement  
+5. Cliquez sur **Apply & Restart**
+
+### 2. Construction de l’Image
+
 ```bash
-# Construire l'image localement
+# Construire l’image localement
 docker build -t goofy-cdn:local -f docker/cdn/Dockerfile .
 ```
 
 ### 3. Déploiement sur Kubernetes Local
 
-1. **Vérifier que kubectl utilise le bon contexte** :
-```bash
-# Voir les contextes disponibles
-kubectl config get-contexts
+1. **Vérifier le Contexte de kubectl** :
 
-# Passer au contexte Docker Desktop si nécessaire
-kubectl config use-context docker-desktop
-```
+    ```bash
+    # Afficher les contextes disponibles
+    kubectl config get-contexts
 
-2. **Déployer l'application** :
-```bash
-# Appliquer les configurations
-kubectl apply -f k8s/cdn-deployment.yaml
-kubectl apply -f k8s/cdn-service.yaml
+    # Utiliser le contexte Docker Desktop si nécessaire
+    kubectl config use-context docker-desktop
+    ```
 
-# Vérifier le déploiement
-kubectl get pods
-kubectl get services
-```
+2. **Déployer l’Application** :
 
-### 4. Accès à l'Application
+    ```bash
+    # Appliquer les fichiers de configuration Kubernetes
+    kubectl apply -f k8s/cdn-deployment.yaml
+    kubectl apply -f k8s/cdn-service.yaml
 
-L'application est accessible via les endpoints suivants :
-- **URL Principale** : `http://localhost:80`
-- **Métriques** : `http://localhost:80/metrics`
-- **Health Check** : `http://localhost:80/health`
-- **Readiness** : `http://localhost:80/ready`
+    # Vérifier l’état des pods et services
+    kubectl get pods
+    kubectl get services
+    ```
+
+### 4. Accès à l’Application
+
+L’application est accessible aux adresses suivantes :
+
+- **URL Principale** : [http://localhost:80](http://localhost:80)
+- **Métriques** : [http://localhost:80/metrics](http://localhost:80/metrics)
+- **Health Check** : [http://localhost:80/health](http://localhost:80/health)
+- **Readiness** : [http://localhost:80/ready](http://localhost:80/ready)
 
 ### 5. Commandes Utiles
 
 ```bash
-# Voir les logs de l'application
+# Afficher les logs de l’application
 kubectl logs -l app=goofy-cdn
 
-# Voir les détails du pod
+# Obtenir les détails d’un pod
 kubectl describe pod -l app=goofy-cdn
 
-# Redémarrer le déploiement (après modification du code)
+# Redémarrer les pods (après modification du code)
 kubectl delete pod -l app=goofy-cdn
 
 # Supprimer le déploiement
@@ -339,34 +351,40 @@ kubectl delete -f k8s/cdn-deployment.yaml
 kubectl delete -f k8s/cdn-service.yaml
 ```
 
-### 6. Troubleshooting
+### 6. Dépannage
 
-#### Pod en CrashLoopBackOff ou Error
+#### Pods en CrashLoopBackOff ou Erreur
+
 ```bash
-# Voir les logs du pod
+# Consulter les logs du pod
 kubectl logs -l app=goofy-cdn
 
-# Voir les détails et événements du pod
+# Afficher les détails et événements du pod
 kubectl describe pod -l app=goofy-cdn
 ```
 
-#### Service inaccessible
+#### Service Inaccessible
+
 1. Vérifier que le service est bien créé :
-```bash
-kubectl get services
-```
+    ```bash
+    kubectl get services
+    ```
 
-2. Vérifier que le pod est Ready :
-```bash
-kubectl get pods -l app=goofy-cdn
-```
+2. S’assurer que le pod est en état Ready :
+    ```bash
+    kubectl get pods -l app=goofy-cdn
+    ```
 
-3. Voir les endpoints :
-```bash
-kubectl get endpoints goofy-cdn-service
-```
+3. Visualiser les endpoints associés :
+    ```bash
+    kubectl get endpoints goofy-cdn-service
+    ```
 
-#### Problèmes d'image
-Si l'image n'est pas trouvée, assurez-vous que :
-1. L'image est bien construite localement : `docker images | grep goofy-cdn`
-2. Le fichier deployment.yaml utilise le bon nom d'image : `image: goofy-cdn:local`
+#### Problèmes d’Image
+
+Si l’image n’est pas trouvée, vérifiez que :
+1. L’image est bien construite localement :
+    ```bash
+    docker images | grep goofy-cdn
+    ```
+2. Le fichier de déploiement utilise le bon nom d’image : `image: goofy-cdn:local`
