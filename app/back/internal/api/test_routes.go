@@ -5,20 +5,56 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"io"
 	"math"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 // SetupTestRoutes configure les routes de test pour le backend
 func SetupTestRoutes(r *gin.Engine) {
 	test := r.Group("/test")
 	{
-		// Test de téléchargement de fichiers de différentes tailles
+		// Test de cache avec contenu statique
+		test.GET("/cache/static/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			content := fmt.Sprintf("Contenu statique pour l'ID %s - Timestamp: %d", id, time.Now().Unix())
+			c.Header("Cache-Control", "public, max-age=60")
+			c.String(http.StatusOK, content)
+		})
+
+		// Test de latence avec différents patterns
+		test.GET("/latency/:pattern", func(c *gin.Context) {
+			pattern := c.Param("pattern")
+			var delay time.Duration
+
+			switch pattern {
+			case "random":
+				delay = time.Duration(float64(time.Second) * (float64(time.Now().UnixNano()%1000) / 1000.0))
+			case "spike":
+				if time.Now().UnixNano()%10 == 0 { // 10% de chance d'avoir un pic
+					delay = 2 * time.Second
+				}
+			case "wave":
+				t := float64(time.Now().Unix())
+				// Génère une latence sinusoïdale entre 100ms et 1s
+				factor := (math.Sin(t/10) + 1) / 2
+				delay = time.Duration(100+900*factor) * time.Millisecond
+			default:
+				delay = 100 * time.Millisecond
+			}
+
+			time.Sleep(delay)
+			c.JSON(http.StatusOK, gin.H{
+				"pattern": pattern,
+				"delay":   delay.String(),
+			})
+		})
+
+		// Test de téléchargement
 		test.GET("/download/:size", func(c *gin.Context) {
 			size := c.Param("size")
 			var fileSize int64
@@ -31,7 +67,7 @@ func SetupTestRoutes(r *gin.Engine) {
 			case "large":
 				fileSize = 100 * 1024 * 1024 // 100MB
 			default:
-				fileSize = 1 * 1024 * 1024 // 1MB par défaut
+				fileSize = 1 * 1024 * 1024
 			}
 
 			// Générer un nom de fichier aléatoire
@@ -42,8 +78,9 @@ func SetupTestRoutes(r *gin.Engine) {
 			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.bin", fileName))
 			c.Header("Content-Type", "application/octet-stream")
 			c.Header("Content-Length", fmt.Sprintf("%d", fileSize))
+			c.Header("Cache-Control", "no-cache")
 
-			// Envoyer les données par chunks pour simuler un téléchargement
+			// Envoyer les données par chunks
 			chunkSize := int64(64 * 1024) // 64KB chunks
 			remaining := fileSize
 
@@ -51,18 +88,26 @@ func SetupTestRoutes(r *gin.Engine) {
 				if remaining < chunkSize {
 					chunkSize = remaining
 				}
-
 				chunk := make([]byte, chunkSize)
 				rand.Read(chunk)
 				c.Writer.Write(chunk)
 				c.Writer.Flush()
-
 				remaining -= chunkSize
 				time.Sleep(time.Millisecond * 10) // Simuler une latence réseau
 			}
 		})
 
-		// Test d'upload de fichiers
+		// Test de compression
+		test.GET("/compression", func(c *gin.Context) {
+			// Générer un texte très compressible
+			var buffer bytes.Buffer
+			for i := 0; i < 1024*1024; i++ { // 1MB de données
+				buffer.WriteByte('a' + byte(i%26))
+			}
+			c.String(http.StatusOK, buffer.String())
+		})
+
+		// Test d'upload
 		test.POST("/upload", func(c *gin.Context) {
 			file, err := c.FormFile("file")
 			if err != nil {
@@ -91,105 +136,36 @@ func SetupTestRoutes(r *gin.Engine) {
 			})
 		})
 
-		// Test de latence variable
-		test.GET("/latency/:pattern", func(c *gin.Context) {
-			pattern := c.Param("pattern")
-			var delay time.Duration
-
-			switch pattern {
-			case "spike":
-				// Pics de latence aléatoires
-				if rand.Float64() < 0.2 { // 20% de chance d'avoir un pic
-					delay = time.Duration(rand.Float64()*5000) * time.Millisecond
-				} else {
-					delay = time.Duration(rand.Float64()*100) * time.Millisecond
-				}
-			case "wave":
-				// Latence sinusoïdale
-				t := float64(time.Now().UnixNano()) / float64(time.Second)
-				wave := math.Sin(t*math.Pi/30) + 1 // Période de 60 secondes
-				delay = time.Duration(wave*500) * time.Millisecond
-			case "random":
-				// Distribution exponentielle
-				delay = time.Duration(rand.ExpFloat64()*1000) * time.Millisecond
-			default:
-				delay = time.Duration(rand.Float64()*1000) * time.Millisecond
-			}
-
-			time.Sleep(delay)
-			c.JSON(http.StatusOK, gin.H{
-				"pattern": pattern,
-				"delay":   delay.String(),
-			})
-		})
-
-		// Test de streaming de données
-		test.GET("/stream/:duration", func(c *gin.Context) {
-			duration, err := time.ParseDuration(c.Param("duration") + "s")
-			if err != nil {
-				duration = 30 * time.Second
-			}
-
+		// Test de streaming
+		test.GET("/stream/:seconds", func(c *gin.Context) {
 			c.Header("Content-Type", "text/event-stream")
 			c.Header("Cache-Control", "no-cache")
 			c.Header("Connection", "keep-alive")
+			c.Header("Transfer-Encoding", "chunked")
 
-			start := time.Now()
+			duration := 10 // Durée par défaut en secondes
+			fmt.Sscanf(c.Param("seconds"), "%d", &duration)
+
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 
-			c.Stream(func(w io.Writer) bool {
-				<-ticker.C
-				if time.Since(start) > duration {
-					return false
+			for i := 0; i < duration; i++ {
+				select {
+				case <-ticker.C:
+					c.SSEvent("message", fmt.Sprintf("Événement %d/%d", i+1, duration))
+					c.Writer.Flush()
+				case <-c.Request.Context().Done():
+					return
 				}
+			}
+		})
 
-				// Générer des données aléatoires
-				data := make([]byte, 1024)
-				rand.Read(data)
-				msg := base64.StdEncoding.EncodeToString(data)
-
-				c.SSEvent("data", gin.H{
-					"timestamp": time.Now().Unix(),
-					"data":     msg[:30] + "...", // Tronquer pour la lisibilité
-				})
-				return true
+		// Endpoint de santé pour le CDN
+		test.GET("/health", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"status": "healthy",
+				"time":   time.Now().Unix(),
 			})
-		})
-
-		// Test de compression
-		test.GET("/compression", func(c *gin.Context) {
-			// Générer un grand texte répétitif
-			var buffer bytes.Buffer
-			for i := 0; i < 1000; i++ {
-				buffer.WriteString("Ceci est un test de compression. Les données répétitives se compressent bien. ")
-			}
-
-			c.Header("Content-Type", "text/plain")
-			c.String(http.StatusOK, buffer.String())
-		})
-
-		// Test d'erreurs
-		test.GET("/error/:type", func(c *gin.Context) {
-			errorType := c.Param("type")
-			switch errorType {
-			case "timeout":
-				time.Sleep(30 * time.Second)
-			case "memory":
-				data := make([]byte, 1024*1024*1024) // Allouer 1GB
-				rand.Read(data)
-				c.String(http.StatusOK, string(data[:100]))
-			case "cpu":
-				start := time.Now()
-				for time.Since(start) < 10*time.Second {
-					// Boucle intensive
-					for i := 0; i < 1000000; i++ {
-						math.Sqrt(float64(i))
-					}
-				}
-			default:
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur interne"})
-			}
 		})
 	}
 }

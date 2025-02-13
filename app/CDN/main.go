@@ -39,18 +39,17 @@ func main() {
 	}
 
 	// Configuration du Load Balancer en mode Weighted Round Robin
-	// avec deux backends de même poids
-	backends := []string{"http://backend:8080","http://backend:8080","http://backend:8080","http://backend:8080","http://backend:8080"}
-	weights := []int{1,1,1,1,1}
+	backends := []string{"http://backend:8080"}
+	weights := []int{1}  // Un seul poids pour un seul backend
 	lb := loadbalancer.NewWeightedRoundRobin(backends, weights, loadbalancer.Config{
-		HealthCheckInterval: time.Second,
+		HealthCheckInterval: 15 * time.Second,
 		HealthCheckTimeout:  time.Second,
 		MaxFailCount:       3,
 		RetryTimeout:       time.Second,
 	})
 
-	// Configuration du Rate Limiter (100 requêtes par minute par IP)
-	rateLimiter := middleware.NewRateLimiter(rate.Limit(100/60.0), 100)
+	// Configuration du Rate Limiter (1000 requêtes par minute par IP)
+	rateLimiter := middleware.NewRateLimiter(rate.Limit(1000/60.0), 1000)
 
 	// Configuration du routeur HTTP
 	mux := http.NewServeMux()
@@ -97,15 +96,25 @@ func main() {
 
 		// Vérification du cache uniquement pour les requêtes GET
 		if r.Method == http.MethodGet {
-			if cachedResponse, found, err := memCache.Get(r.Context(), r.URL.Path); err == nil && found {
-				metrics.CacheHits.Inc()
-				log.WithFields(logrus.Fields{
-					"request_id": requestID,
-					"path":      r.URL.Path,
-					"source":    "cache",
-				}).Info("Réponse servie depuis le cache")
-				w.Write(cachedResponse.Value.([]byte))
-				return
+			// Création d'une clé de cache unique qui inclut l'authentification
+			cacheKey := r.URL.Path
+			if auth := r.Header.Get("Authorization"); auth != "" {
+				// On ajoute un hash de l'authentification à la clé
+				cacheKey = fmt.Sprintf("%s:%s", cacheKey, auth)
+			}
+
+			if cachedResponse, found, err := memCache.Get(r.Context(), cacheKey); err == nil && found {
+				// Vérifier si la réponse en cache contient des informations d'authentification
+				if auth, ok := cachedResponse.Headers["auth"]; ok && auth == r.Header.Get("Authorization") {
+					metrics.CacheHits.Inc()
+					log.WithFields(logrus.Fields{
+						"request_id": requestID,
+						"path":      r.URL.Path,
+						"source":    "cache",
+					}).Info("Réponse servie depuis le cache")
+					w.Write(cachedResponse.Value.([]byte))
+					return
+				}
 			}
 			metrics.CacheMisses.Inc()
 		}
@@ -168,7 +177,16 @@ func main() {
 
 		// Mettre en cache si c'est une requête GET
 		if r.Method == http.MethodGet && resp.StatusCode == http.StatusOK {
-			if err := memCache.Set(r.Context(), r.URL.Path, body, map[string]string{}, 1*time.Hour); err != nil {
+			cacheKey := r.URL.Path
+			metadata := map[string]string{}
+			
+			// Si la requête est authentifiée, on stocke l'authentification dans les métadonnées
+			if auth := r.Header.Get("Authorization"); auth != "" {
+				cacheKey = fmt.Sprintf("%s:%s", cacheKey, auth)
+				metadata["auth"] = auth
+			}
+
+			if err := memCache.Set(r.Context(), cacheKey, body, metadata, 1*time.Hour); err != nil {
 				log.WithFields(logrus.Fields{
 					"request_id": requestID,
 					"error":     err,
@@ -199,46 +217,35 @@ func main() {
 	handler := middleware.SecurityHeaders(rateLimiter.RateLimit(mainHandler))
 	mux.Handle("/", handler)
 
-	// Configuration du serveur
+	// Configuration du serveur HTTP
 	srv := &http.Server{
 		Addr:         ":8080",
 		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
+
+	// Démarrage du serveur dans une goroutine
+	go func() {
+		log.Printf("Serveur démarré sur le port %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.WithError(err).Fatal("Erreur lors du démarrage du serveur")
+		}
+	}()
 
 	// Canal pour les signaux d'arrêt
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	// Démarrage du serveur dans une goroutine
-	go func() {
-		log.WithFields(logrus.Fields{
-			"address": srv.Addr,
-			"pid":     os.Getpid(),
-		}).Info("Démarrage du serveur CDN")
-
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.WithError(err).Fatal("Erreur démarrage serveur")
-		}
-	}()
-
-	// Attente du signal d'arrêt
 	<-stop
-	log.Info("Arrêt du serveur en cours...")
+	log.Info("Arrêt du serveur...")
 
-	// Création d'un contexte avec timeout pour l'arrêt gracieux
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
 		log.WithError(err).Error("Erreur lors de l'arrêt du serveur")
-	}
-
-	// Fermeture du load balancer
-	if err := lb.Close(); err != nil {
-		log.WithError(err).Error("Erreur lors de la fermeture du load balancer")
 	}
 
 	log.Info("Serveur arrêté avec succès")

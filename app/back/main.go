@@ -1,10 +1,12 @@
 package main
 
 import (
+	"app/internal/api"
 	"app/internal/handlers"
 	"app/internal/middleware"
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -58,7 +60,8 @@ func main() {
 	// Configuration de Gin
 	r := gin.Default()
 
-	r.GET("/health", healthHandler.Health)
+	// Configuration des routes de test
+	api.SetupTestRoutes(r)
 
 	// Routes publiques
 	r.POST("/register", authHandler.Register)
@@ -79,14 +82,24 @@ func main() {
 		protected.DELETE("/files/:id", fileHandler.DeleteFile)
 	}
 
-	// Démarrage du serveur
+	// Configuration du serveur HTTP
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
+	r.GET("/health", healthHandler.Health)
+
+	server := &http.Server{
+		Addr:         "0.0.0.0:" + port,
+		Handler:      r,
+		ReadTimeout:  30 * time.Second,    // Augmente le timeout de lecture
+		WriteTimeout: 30 * time.Second,    // Augmente le timeout d'écriture
+		IdleTimeout:  120 * time.Second,   // Augmente le timeout d'inactivité
+	}
+
 	log.Printf("Serveur démarré sur le port %s", port)
-	if err := r.Run("0.0.0.0:" + port); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
