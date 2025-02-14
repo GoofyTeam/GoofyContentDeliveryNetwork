@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: cdn
-          image: misterzapp/goofy-cdn:latest
+          image: adr181100/goofy-cdn:latest
           ports:
             - containerPort: 8080
           env:

@@ -188,10 +188,10 @@ Pour contribuer :
 
 ```bash
 # Construction de l’image Docker
-docker build -t misterzapp/goofy-cdn:latest -f docker/cdn/Dockerfile .
+docker build -t adr181100/goofy-cdn:latest -f docker/cdn/Dockerfile .
 
 # Envoi de l’image sur Docker Hub
-docker push misterzapp/goofy-cdn:latest
+docker push adr181100/goofy-cdn:latest
 ```
 
 ### 2. Déploiement sur EKS
