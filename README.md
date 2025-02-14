@@ -87,27 +87,13 @@ npm run dev
 
 ```
 app/
-├── back/
-│   ├── internal/
-│   │   ├── api/          # Gestion des routes API
-│   │   ├── loadbalancer/ # Algorithmes d’équilibrage
-│   │   ├── middleware/   # Sécurité & monitoring
-│
-├── CDN/
-│   ├── config/           # Paramètres du projet
-│   ├── internal/         # Code cœur du CDN
-│   ├── docs/             # Documentation API
-│   ├── main.go           # Point d’entrée du serveur
-│
-└── front/
-    ├── public/          # Fichiers statiques
-    ├── src/
-    │   ├── assets/      # Images & icônes
-    │   ├── components/  # Composants React
-    │   ├── hooks/       # Hooks personnalisés
-    │   ├── libs/        # Fonctions utilitaires
-    │   ├── pages/       # Pages de l’app
-    │   ├── routes/      # Gestion des routes
+├── internal/
+│   ├── cache/          # Gestion du cache (implémentation LRU et intégration Redis)
+│   ├── loadbalancer/   # Algorithmes de répartition de charge
+│   └── middleware/     # Middlewares pour la sécurité et le monitoring
+├── pkg/
+│   └── config/         # Fichiers de configuration de l’application
+└── main.go             # Point d’entrée de l’application
 ```
 
 ---
