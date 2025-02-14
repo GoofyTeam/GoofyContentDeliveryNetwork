@@ -1,0 +1,27 @@
+global:
+  resolve_timeout: 5m
+  smtp_from: 'alertmanager@goofycdn.com'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'your-email@gmail.com'  # À remplacer
+  smtp_auth_password: 'your-app-password'  # À remplacer
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'email-notifications'
+
+receivers:
+- name: 'email-notifications'
+  email_configs:
+  - to: 'tgamiette@kernix.com, foxteddy971@gmail.com'
+    send_resolved: true
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname']

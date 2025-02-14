@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cdn
+  namespace: goofy-cdn
+
+spec:
+  selector:
+    app: cdn
+  ports:
+    - name: http
+      protocol: TCP
+      port: 9000        # Port exposé par le service
+      targetPort: 8080  # Port du conteneur
+  type: LoadBalancer
