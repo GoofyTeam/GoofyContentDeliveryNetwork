@@ -1,8 +1,12 @@
 import Input from "@/components/Input";
-import { Link } from "@tanstack/react-router";
+import useAuth from "@/hooks/useAuth";
+import { Link, useNavigate } from "@tanstack/react-router";
 import React, { ChangeEvent, useState } from "react";
 
 const Login: React.FC = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -17,10 +21,40 @@ const Login: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: ChangeEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    console.log('Form submitted:', formData);
-  };
+  const handleSubmit = async (e: ChangeEvent<HTMLFormElement>) => {
+      e.preventDefault();
+  
+      try {
+        const response = await fetch("http://localhost:8080/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            Email: formData.email,
+            Password: formData.password,
+          }),
+        });
+  
+        if (!response.ok) {
+          throw new Error('Login failed')
+        }
+
+        const data = await response.json();
+
+        // Vérifiez que la réponse contient bien un token
+        if (data.token) {
+          await login({ id: formData.email, email: formData.email }, data.token);
+        } else {
+          throw new Error('No token received')
+        }
+  
+        console.log('Login succesfully')
+        navigate({ to: "/drive" });
+      } catch (error) {
+        throw new Error(`Error during login: ${error}`)
+      }
+    };
 
   return (
     <section className='min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8'>

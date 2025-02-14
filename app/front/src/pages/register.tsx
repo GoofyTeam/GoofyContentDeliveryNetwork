@@ -1,8 +1,9 @@
 import Input from "@/components/Input";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import React, { ChangeEvent, useState } from "react";
 
 const Register: React.FC = () => {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -20,9 +21,31 @@ const Register: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: ChangeEvent<HTMLFormElement>) => {
+
+  const handleSubmit = async (e: ChangeEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
+
+    try {
+      const response = await fetch("http://localhost:8080/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          Email: formData.email,
+          Password: formData.password,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Registering failed')
+      }
+
+      console.log('Registered succesfully')
+      navigate({ to: "/login" });
+    } catch (error) {
+      throw new Error(`Error during registering: ${error}`)
+    }
   };
 
   return (

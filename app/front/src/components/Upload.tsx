@@ -1,4 +1,4 @@
-import { FileData } from '@/pages/Index';
+import { FileData } from '@/pages/drive';
 import { Loader, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 
