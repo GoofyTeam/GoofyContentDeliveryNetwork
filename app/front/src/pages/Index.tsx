@@ -1,5 +1,5 @@
 import UploadModal from '@/components/Upload';
-import { Upload } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
 import { useState } from 'react';
 
 export interface FileData {
@@ -8,6 +8,7 @@ export interface FileData {
   type: string;
   size: string;
   lastModified: string;
+  url?: string;
 }
 
 const initialFiles = [
@@ -17,13 +18,14 @@ const initialFiles = [
     type: 'pdf',
     size: '2.5 MB',
     lastModified: '2024-02-13',
+    url: '/files/Document.pdf'
   },
   {
     id: 2,
     name: 'Images',
     type: 'folder',
     size: '128 MB',
-    lastModified: '2024-02-12',
+    lastModified: '2024-02-12'
   },
   {
     id: 3,
@@ -31,6 +33,7 @@ const initialFiles = [
     type: 'docx',
     size: '1.8 MB',
     lastModified: '2024-02-11',
+    url: '/files/Document.pdf'
   },
   {
     id: 4,
@@ -38,6 +41,7 @@ const initialFiles = [
     type: 'pptx',
     size: '5.2 MB',
     lastModified: '2024-02-10',
+    url: '/files/Document.pdf'
   },
 ];
 
@@ -47,6 +51,27 @@ export default function Drive() {
 
   const handleUploadComplete = (newFiles: FileData[]) => {
     setFiles((prev) => [...newFiles, ...prev]);
+  };
+
+  const handleDownload = async (file: FileData) => {
+    if (file.type === 'folder') {
+      return;
+    }
+
+    try {
+      if (!file.url) {
+        throw new Error('URL de téléchargement non disponible');
+      }
+
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Erreur lors du téléchargement:', error);
+    }
   };
 
   return (
@@ -79,6 +104,9 @@ export default function Drive() {
                 </th>
                 <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                   Dernière modification
+                </th>
+                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -116,6 +144,18 @@ export default function Drive() {
                     <span className='text-sm text-gray-500 dark:text-gray-400'>
                       {file.lastModified}
                     </span>
+                  </td>
+                  <td className='px-6 py-4 whitespace-nowrap'>
+                    <button 
+                      onClick={() => handleDownload(file)}
+                      disabled={file.type === 'folder'}
+                      className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                        file.type === 'folder' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                      }`}
+                      title={file.type === 'folder' ? 'Les dossiers ne peuvent pas être téléchargés' : 'Télécharger'}
+                    >
+                      <Download className='h-5 w-5 text-gray-500 dark:text-gray-400' />
+                    </button>
                   </td>
                 </tr>
               ))}
