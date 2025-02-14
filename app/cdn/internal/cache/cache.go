@@ -19,6 +19,9 @@ type CacheMetrics struct {
 	Items  uint64
 }
 
+
+
+
 // CacheEntry représente une entrée dans le cache avec TTL
 type CacheEntry struct {
 	Value      interface{}
