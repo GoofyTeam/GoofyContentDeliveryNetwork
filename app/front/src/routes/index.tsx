@@ -1,12 +1,5 @@
-import Index from "@/pages/Index";
-import { createFileRoute } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/router-devtools";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
-  component: () => (
-    <>
-      <Index />
-      <TanStackRouterDevtools position="bottom-right" />
-    </>
-  ),
+  component: Outlet,
 });

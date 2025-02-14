@@ -34,7 +34,7 @@ Ce projet, développé en Go, met en place un Content Delivery Network (CDN) afi
 Lancer l’application en mode développement avec hot-reload :
 
 ```bash
-docker compose up app-dev
+docker compose -f docker-compose.dev.yml up
 ```
 
 - Accessible via [http://localhost:8080](http://localhost:8080)
@@ -45,7 +45,7 @@ docker compose up app-dev
 Démarrer en mode production :
 
 ```bash
-docker compose up app-prod
+docker compose -f docker-compose.prod.yml up
 ```
 
 - Optimisé pour un environnement de production

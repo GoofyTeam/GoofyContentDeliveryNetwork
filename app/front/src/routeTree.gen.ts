@@ -13,7 +13,10 @@
 import { Route as rootRoute } from './routes/__root'
 import { Route as RegisterImport } from './routes/register'
 import { Route as LoginImport } from './routes/login'
+import { Route as AuthImport } from './routes/_auth'
 import { Route as IndexImport } from './routes/index'
+import { Route as AuthDriveIndexImport } from './routes/_auth/drive/index'
+import { Route as AuthDriveFolderPathImport } from './routes/_auth/drive/$folderPath'
 
 // Create/Update Routes
 
@@ -29,10 +32,27 @@ const LoginRoute = LoginImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const AuthRoute = AuthImport.update({
+  id: '/_auth',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRoute,
+} as any)
+
+const AuthDriveIndexRoute = AuthDriveIndexImport.update({
+  id: '/drive/',
+  path: '/drive/',
+  getParentRoute: () => AuthRoute,
+} as any)
+
+const AuthDriveFolderPathRoute = AuthDriveFolderPathImport.update({
+  id: '/drive/$folderPath',
+  path: '/drive/$folderPath',
+  getParentRoute: () => AuthRoute,
 } as any)
 
 // Populate the FileRoutesByPath interface
@@ -44,6 +64,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/_auth': {
+      id: '/_auth'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof AuthImport
       parentRoute: typeof rootRoute
     }
     '/login': {
@@ -60,47 +87,91 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterImport
       parentRoute: typeof rootRoute
     }
+    '/_auth/drive/$folderPath': {
+      id: '/_auth/drive/$folderPath'
+      path: '/drive/$folderPath'
+      fullPath: '/drive/$folderPath'
+      preLoaderRoute: typeof AuthDriveFolderPathImport
+      parentRoute: typeof AuthImport
+    }
+    '/_auth/drive/': {
+      id: '/_auth/drive/'
+      path: '/drive'
+      fullPath: '/drive'
+      preLoaderRoute: typeof AuthDriveIndexImport
+      parentRoute: typeof AuthImport
+    }
   }
 }
 
 // Create and export the route tree
 
+interface AuthRouteChildren {
+  AuthDriveFolderPathRoute: typeof AuthDriveFolderPathRoute
+  AuthDriveIndexRoute: typeof AuthDriveIndexRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthDriveFolderPathRoute: AuthDriveFolderPathRoute,
+  AuthDriveIndexRoute: AuthDriveIndexRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/drive/$folderPath': typeof AuthDriveFolderPathRoute
+  '/drive': typeof AuthDriveIndexRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/drive/$folderPath': typeof AuthDriveFolderPathRoute
+  '/drive': typeof AuthDriveIndexRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/_auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/_auth/drive/$folderPath': typeof AuthDriveFolderPathRoute
+  '/_auth/drive/': typeof AuthDriveIndexRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/register'
+  fullPaths: '/' | '' | '/login' | '/register' | '/drive/$folderPath' | '/drive'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/register'
-  id: '__root__' | '/' | '/login' | '/register'
+  to: '/' | '' | '/login' | '/register' | '/drive/$folderPath' | '/drive'
+  id:
+    | '__root__'
+    | '/'
+    | '/_auth'
+    | '/login'
+    | '/register'
+    | '/_auth/drive/$folderPath'
+    | '/_auth/drive/'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRouteWithChildren
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRouteWithChildren,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
 }
@@ -116,6 +187,7 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/_auth",
         "/login",
         "/register"
       ]
@@ -123,11 +195,26 @@ export const routeTree = rootRoute
     "/": {
       "filePath": "index.tsx"
     },
+    "/_auth": {
+      "filePath": "_auth.tsx",
+      "children": [
+        "/_auth/drive/$folderPath",
+        "/_auth/drive/"
+      ]
+    },
     "/login": {
       "filePath": "login.tsx"
     },
     "/register": {
       "filePath": "register.tsx"
+    },
+    "/_auth/drive/$folderPath": {
+      "filePath": "_auth/drive/$folderPath.tsx",
+      "parent": "/_auth"
+    },
+    "/_auth/drive/": {
+      "filePath": "_auth/drive/index.tsx",
+      "parent": "/_auth"
     }
   }
 }
