@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: goofy-cdn
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8081
+      targetPort: 8080
+      protocol: TCP
+  type: LoadBalancer  # Pour obtenir une IP externe

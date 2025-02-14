@@ -38,28 +38,43 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 	}
 	defer file.Close()
 
+	userID, _ := c.Get("user_id")
+	userIDObj, _ := userID.(primitive.ObjectID)
+
 	// Récupération de l'ID du dossier parent
-	folderID, err := primitive.ObjectIDFromHex(c.PostForm("folder_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid folder ID"})
-		return
+	var folder models.Folder
+	folderIDStr := c.PostForm("folder_id")
+	if folderIDStr == "" {
+		// Si aucun dossier n'est spécifié, on utilise le dossier racine
+		err = h.folderCollection.FindOne(c, bson.M{
+			"user_id": userIDObj,
+			"name":    "root",
+			"depth":   0,
+		}).Decode(&folder)
+	} else {
+		folderID, err := primitive.ObjectIDFromHex(folderIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid folder ID format"})
+			return
+		}
+		// Vérification que le dossier existe et appartient à l'utilisateur
+		err = h.folderCollection.FindOne(c, bson.M{
+			"_id":     folderID,
+			"user_id": userIDObj,
+		}).Decode(&folder)
 	}
 
-	userID, _ := c.Get("user_id")
-
-	// Vérification que le dossier existe et appartient à l'utilisateur
-	var folder models.Folder
-	err = h.folderCollection.FindOne(c, bson.M{
-		"_id":     folderID,
-		"user_id": userID,
-	}).Decode(&folder)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Folder not found"})
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Folder not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding folder"})
+		}
 		return
 	}
 
 	// Création du chemin de stockage
-	userDir := filepath.Join(h.uploadDir, userID.(primitive.ObjectID).Hex())
+	userDir := filepath.Join(h.uploadDir, userIDObj.Hex())
 	if err := os.MkdirAll(userDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
 		return
@@ -89,8 +104,8 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		Path:      filePath,
 		Size:      header.Size,
 		MimeType:  header.Header.Get("Content-Type"),
-		FolderID:  folderID,
-		UserID:    userID.(primitive.ObjectID),
+		FolderID:  folder.ID,
+		UserID:    userIDObj,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}

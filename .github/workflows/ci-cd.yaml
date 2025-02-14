@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 jobs:
   test:
@@ -27,7 +27,7 @@ jobs:
           go test -v ./...
 
       - name: Test CDN
-        working-directory: ./app/CDN
+        working-directory: ./app/cdn
         continue-on-error: true
         run: |
           go mod tidy
@@ -80,7 +80,7 @@ jobs:
           aws-region: eu-west-3
 
       - name: Update kube config
-        run: aws eks update-kubeconfig --name goofy-cluster
+        run: aws eks update-kubeconfig --name hetic-groupe-3
 
       - name: Create or update Kubernetes secrets
         run: |

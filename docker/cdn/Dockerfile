@@ -6,15 +6,15 @@ WORKDIR /app
 # Installation des dépendances de build
 RUN apk add --no-cache git
 
-# Copie des fichiers de dépendances d'abord
-COPY app/CDN/go.mod app/CDN/go.sum ./
+# Copie des fichiers de dépendances
+COPY app/cdn/go.mod app/cdn/go.sum ./
 RUN go mod download
 
 # Copie du reste du code source
-COPY app/CDN/ .
+COPY app/cdn/ .
 
 # Compilation de l'application avec optimisations
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 
 # Étape finale avec une image minimale
 FROM alpine:latest
@@ -26,10 +26,7 @@ RUN apk --no-cache add ca-certificates
 
 # Copie du binaire depuis l'étape de build
 COPY --from=builder /app/main .
-
-# Création d'un utilisateur non-root
-RUN adduser -D appuser
-USER appuser
+# COPY --from=builder /app/.env .
 
 # Exposition du port
 EXPOSE 8080

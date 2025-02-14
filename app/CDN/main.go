@@ -40,16 +40,16 @@ func main() {
 
 	// Configuration du Load Balancer en mode Weighted Round Robin
 	backends := []string{"http://backend:8080"}
-	weights := []int{1}  // Un seul poids pour un seul backend
+	weights := []int{1} // Un seul poids pour un seul backend
 	lb := loadbalancer.NewWeightedRoundRobin(backends, weights, loadbalancer.Config{
 		HealthCheckInterval: 15 * time.Second,
 		HealthCheckTimeout:  time.Second,
-		MaxFailCount:       3,
-		RetryTimeout:       time.Second,
+		MaxFailCount:        3,
+		RetryTimeout:        time.Second,
 	})
 
 	// Configuration du Rate Limiter (1000 requêtes par minute par IP)
-	rateLimiter := middleware.NewRateLimiter(rate.Limit(1000/60.0), 1000)
+	rateLimiter := middleware.NewRateLimiter(rate.Limit(100/60.0), 100)
 
 	// Configuration du routeur HTTP
 	mux := http.NewServeMux()
@@ -109,8 +109,8 @@ func main() {
 					metrics.CacheHits.Inc()
 					log.WithFields(logrus.Fields{
 						"request_id": requestID,
-						"path":      r.URL.Path,
-						"source":    "cache",
+						"path":       r.URL.Path,
+						"source":     "cache",
 					}).Info("Réponse servie depuis le cache")
 					w.Write(cachedResponse.Value.([]byte))
 					return
@@ -125,7 +125,7 @@ func main() {
 			metrics.RecordRequest(r.Method, r.URL.Path, http.StatusServiceUnavailable, time.Since(start).Seconds(), 0)
 			log.WithFields(logrus.Fields{
 				"request_id": requestID,
-				"error":     err,
+				"error":      err,
 			}).Error("Aucun backend disponible")
 			http.Error(w, "No backend available", http.StatusServiceUnavailable)
 			return
@@ -137,7 +137,7 @@ func main() {
 			metrics.RecordRequest(r.Method, r.URL.Path, http.StatusBadGateway, time.Since(start).Seconds(), 0)
 			log.WithFields(logrus.Fields{
 				"request_id": requestID,
-				"error":     err,
+				"error":      err,
 			}).Error("Erreur création requête backend")
 			http.Error(w, "Backend error", http.StatusBadGateway)
 			return
@@ -156,7 +156,7 @@ func main() {
 			log.WithFields(logrus.Fields{
 				"request_id": requestID,
 				"backend":    backend.URL,
-				"error":     err,
+				"error":      err,
 			}).Error("Erreur requête backend")
 			http.Error(w, "Backend error", http.StatusBadGateway)
 			return
@@ -169,7 +169,7 @@ func main() {
 			metrics.RecordRequest(r.Method, r.URL.Path, http.StatusInternalServerError, time.Since(start).Seconds(), 0)
 			log.WithFields(logrus.Fields{
 				"request_id": requestID,
-				"error":     err,
+				"error":      err,
 			}).Error("Erreur lecture réponse")
 			http.Error(w, "Error reading response", http.StatusInternalServerError)
 			return
@@ -179,7 +179,7 @@ func main() {
 		if r.Method == http.MethodGet && resp.StatusCode == http.StatusOK {
 			cacheKey := r.URL.Path
 			metadata := map[string]string{}
-			
+
 			// Si la requête est authentifiée, on stocke l'authentification dans les métadonnées
 			if auth := r.Header.Get("Authorization"); auth != "" {
 				cacheKey = fmt.Sprintf("%s:%s", cacheKey, auth)
@@ -189,7 +189,7 @@ func main() {
 			if err := memCache.Set(r.Context(), cacheKey, body, metadata, 1*time.Hour); err != nil {
 				log.WithFields(logrus.Fields{
 					"request_id": requestID,
-					"error":     err,
+					"error":      err,
 				}).Error("Erreur mise en cache")
 			}
 		}
@@ -207,7 +207,7 @@ func main() {
 
 		log.WithFields(logrus.Fields{
 			"request_id":   requestID,
-			"status_code": resp.StatusCode,
+			"status_code":  resp.StatusCode,
 			"backend":      backend.URL,
 			"elapsed_time": time.Since(time.Unix(0, requestIDInt)).String(),
 		}).Info("Requête terminée")

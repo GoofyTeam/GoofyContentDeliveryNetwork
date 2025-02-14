@@ -10,11 +10,11 @@ RUN apk add --no-cache git
 RUN go install github.com/air-verse/air@latest
 
 # Copie des fichiers de dépendances
-COPY app/CDN/go.mod app/CDN/go.sum ./
+COPY app/cdn/go.mod app/cdn/go.sum ./
 RUN go mod download
 
 # Configuration de Air
-COPY app/CDN/.air.toml ./
+COPY app/cdn/.air.toml ./
 
 # Le code source sera monté comme un volume
 CMD ["air"]

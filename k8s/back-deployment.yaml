@@ -14,21 +14,21 @@ spec:
         app: backend
     spec:
       containers:
-      - name: backend
-        image: goofy-cdn-back:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: MONGODB_URI
-          valueFrom:
-            secretKeyRef:
-              name: app-secrets
-              key: mongodb-uri
-        - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: app-secrets
-              key: jwt-secret
+        - name: backend
+          image: misterzapp/goofy-back:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mongodb-uri
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: jwt-secret
 ---
 apiVersion: v1
 kind: Service
@@ -39,6 +39,6 @@ spec:
   selector:
     app: backend
   ports:
-  - port: 8080
-    targetPort: 8080
+    - port: 8080
+      targetPort: 8080
   type: ClusterIP

@@ -13,3 +13,4 @@ air.log
 # Environment variables
 .env
 .env.localgit
+uploads

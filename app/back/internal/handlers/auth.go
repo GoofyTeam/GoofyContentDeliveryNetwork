@@ -17,12 +17,14 @@ import (
 )
 
 type AuthHandler struct {
-	userCollection *mongo.Collection
+	userCollection   *mongo.Collection
+	folderCollection *mongo.Collection
 }
 
 func NewAuthHandler(db *mongo.Database) *AuthHandler {
 	return &AuthHandler{
-		userCollection: db.Collection("users"),
+		userCollection:   db.Collection("users"),
+		folderCollection: db.Collection("folders"),
 	}
 }
 
@@ -61,13 +63,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Log pour le débogage
-	fmt.Printf("Register - Password length: %d, Hash length: %d\n", len(user.Password), len(hashedPassword))
-
-	// Création de l'utilisateur
+	// Préparation de l'utilisateur pour l'insertion
+	now := time.Now()
 	user.Password = string(hashedPassword)
-	user.CreatedAt = time.Now()
-	user.UpdatedAt = time.Now()
+	user.CreatedAt = now
+	user.UpdatedAt = now
 
 	result, err := h.userCollection.InsertOne(c, user)
 	if err != nil {
@@ -75,10 +75,49 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user.ID = result.InsertedID.(primitive.ObjectID)
-	user.Password = "" // Ne pas renvoyer le mot de passe
+	// Récupération de l'ID généré
+	userID := result.InsertedID.(primitive.ObjectID)
+	user.ID = userID
 
+	// Création du dossier racine pour l'utilisateur
+	rootFolder := models.Folder{
+		Name:      "root",
+		Path:      "/",
+		UserID:    userID,
+		Depth:     0,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	// Insertion du dossier racine
+	_, err = h.folderCollection.InsertOne(c, rootFolder)
+	if err != nil {
+		_, deleteErr := h.userCollection.DeleteOne(c, bson.M{"_id": userID})
+		if deleteErr != nil {
+			fmt.Printf("Erreur lors de la suppression de l'utilisateur: %v\n", deleteErr)
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create root folder"})
+		return
+	}
+
+	// token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	// 	"user_id": user.ID.Hex(),
+	// 	"email":   user.Email,
+	// 	"exp":     time.Now().Add(time.Hour * 24).Unix(), // Token valide 24h
+	// })
+
+	// tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	// if err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la génération du token"})
+	// 	return
+	// }
+
+	user.Password = "" // On ne renvoie pas le mot de passe
 	c.JSON(http.StatusCreated, user)
+	// c.JSON(http.StatusCreated, gin.H{
+	// 	"token": tokenString,
+	// 	"user":  user,
+	// })
 }
 
 // Login authentifie un utilisateur et renvoie un token JWT
