@@ -4,6 +4,11 @@ Un **CDN (Content Delivery Network)** développé en Go, conçu pour accélérer
 
 ---
 
+
+## Membre du groupe
+groupe 3 :  Adrien ALBUQUERQUE, Thomas BUISSON, Matteo COURQUIN, Thanh-long PHAM
+
+
 ## 🔹 Fonctionnalités
 
 ### 🔀 Proxy HTTP
